@@ -10,5 +10,11 @@ class Maquina:
         if len(self.tarefas) <= self.maximo_tarefas:
             self.tarefas.add(tarefa)
 
+    def forcar_adicionar_tarefa(self, tarefa: int):
+        self.tarefas.add(tarefa)
+
     def pode_adicionar_tarefa(self):
         return len(self.tarefas) <= self.maximo_tarefas
+
+    def remover_tarefa(self, tarefa):
+        self.tarefas.remove(tarefa)
