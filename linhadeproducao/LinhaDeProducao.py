@@ -2,6 +2,7 @@ from linhadeproducao.Maquina import Maquina
 import math
 import sys
 import time
+import random
 
 NOME_ARQUIVO_SOLUCAO = 'solução.txt'
 
@@ -248,6 +249,37 @@ class LinhaDeProducao:
         return tarefa_maior_custo
 
 
+
+
+
+
+    def salvar_solucao(self):
+        with open(NOME_ARQUIVO_SOLUCAO, 'w+') as arquivo_solucao:
+            stdout_original = sys.stdout
+            sys.stdout = arquivo_solucao
+            self.imprimir_solucao()
+            self.imprimir_tempo_segundos()
+            sys.stdout = stdout_original
+
+    def esta_precedencias_respeitada(self) -> bool:
+        for predecessor, sucessor in self.lista_predecessao:
+            index_maquina_predecessor: int = 0
+            index_maquina_sucessor: int = 0
+
+            for i in range(len(self.maquinas)):
+                if predecessor in self.maquinas[i].tarefas:
+                    index_maquina_predecessor = i
+                if sucessor in self.maquinas[i].tarefas:
+                    index_maquina_sucessor = i
+
+            if index_maquina_predecessor > index_maquina_sucessor:
+                return False
+        return True
+
+    def doar_tarefa(self, index_doador, index_recebedor, tarefa):
+        self.maquinas[index_doador].remover_tarefa(tarefa)
+        self.maquinas[index_recebedor].forcar_adicionar_tarefa(tarefa)
+
     def refinar_solucao(self, numero_iteracoes: int) -> None:
 
         if numero_iteracoes <= 0:
@@ -274,13 +306,11 @@ class LinhaDeProducao:
                     tarefas_adjacentes_na_maquina_maior_FO = self.pegar_tarefas_sucessoras_entre_maquinas(
                         index_maquina_adjacente, index_maquina_maior_FO)
                     for tarefa in tarefas_adjacentes_na_maquina_maior_FO:
-                        self.maquinas[index_maquina_maior_FO].remover_tarefa(tarefa)
-                        self.maquinas[index_maquina_adjacente].forcar_adicionar_tarefa(tarefa)
+                        self.doar_tarefa(index_maquina_maior_FO, index_maquina_adjacente, tarefa)
                         FO_nova = self.pegar_maior_FO()
 
                         if not self.esta_precedencias_respeitada() or FO_nova > FO_anterior:
-                            self.maquinas[index_maquina_maior_FO].forcar_adicionar_tarefa(tarefa)
-                            self.maquinas[index_maquina_adjacente].remover_tarefa(tarefa)
+                            self.doar_tarefa(index_maquina_adjacente, index_maquina_maior_FO, tarefa)
                         else:
                             bandeira_mudanca_legal = True
                             break
@@ -289,13 +319,11 @@ class LinhaDeProducao:
                         break
                 else:
                     for tarefa in tarefas_adjacentes_na_maquina_maior_FO:
-                        self.maquinas[index_maquina_maior_FO].remover_tarefa(tarefa)
-                        self.maquinas[index_maquina_adjacente].forcar_adicionar_tarefa(tarefa)
+                        self.doar_tarefa(index_maquina_maior_FO, index_maquina_adjacente, tarefa)
                         FO_nova = self.pegar_maior_FO()
 
                         if not self.esta_precedencias_respeitada() or FO_nova > FO_anterior:
-                            self.maquinas[index_maquina_maior_FO].forcar_adicionar_tarefa(tarefa)
-                            self.maquinas[index_maquina_adjacente].remover_tarefa(tarefa)
+                            self.doar_tarefa(index_maquina_adjacente, index_maquina_maior_FO, tarefa)
                         else:
                             bandeira_mudanca_legal = True
                             break
@@ -305,27 +333,36 @@ class LinhaDeProducao:
         tempo_final = time.perf_counter()
         self.tempo_execucao = tempo_final - self.tempo_inicial
 
+    def perturbar_solucao(self) -> tuple[int, int, int]:
+        index_maquina_aleatoria: int = random.randrange(len(self.maquinas))
+        index_maquinas_adjacentes: list[int] = self.pegar_index_maquinas_adjacentes(index_maquina_aleatoria)
+        index_maquina_adjacente_aleatoria: int = random.choice(index_maquinas_adjacentes)
 
+        tarefas_adjascentes_maquina_escolhida = self.pegar_tarefas_sucessoras_entre_maquinas(index_maquina_adjacente_aleatoria, index_maquina_aleatoria)
 
-    def salvar_solucao(self):
-        with open(NOME_ARQUIVO_SOLUCAO, 'w+') as arquivo_solucao:
-            stdout_original = sys.stdout
-            sys.stdout = arquivo_solucao
-            self.imprimir_solucao()
-            self.imprimir_tempo_segundos()
-            sys.stdout = stdout_original
+        if not tarefas_adjascentes_maquina_escolhida:
+            temp = index_maquina_aleatoria
+            index_maquina_aleatoria = index_maquina_adjacente_aleatoria
+            index_maquina_adjacente_aleatoria = temp
 
-    def esta_precedencias_respeitada(self) -> bool:
-        for predecessor, sucessor in self.lista_predecessao:
-            index_maquina_predecessor: int = 0
-            index_maquina_sucessor: int = 0
+            tarefas_adjascentes_maquina_escolhida = self.pegar_tarefas_sucessoras_entre_maquinas(index_maquina_adjacente_aleatoria, index_maquina_aleatoria)
 
-            for i in range(len(self.maquinas)):
-                if predecessor in self.maquinas[i].tarefas:
-                    index_maquina_predecessor = i
-                if sucessor in self.maquinas[i].tarefas:
-                    index_maquina_sucessor = i
+            for tarefa in tarefas_adjascentes_maquina_escolhida:
+                self.doar_tarefa(index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
 
-            if index_maquina_predecessor > index_maquina_sucessor:
-                return False
-        return True
+                if not self.esta_precedencias_respeitada():
+                    self.doar_tarefa(index_maquina_adjacente_aleatoria)
+                else:
+                    return (index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+
+        else:
+            for tarefa in tarefas_adjascentes_maquina_escolhida:
+                self.doar_tarefa(index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+
+                if not self.esta_precedencias_respeitada():
+                    self.doar_tarefa(index_maquina_adjacente_aleatoria)
+                else:
+                    return (index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+
+    def simulated_annealing(self):
+        pass

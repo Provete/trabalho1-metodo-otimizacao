@@ -4,7 +4,11 @@ import sys
 #feito por: Gustavo Provete de Andrade
 
 if __name__ == '__main__':
-    LP: LinhaDeProducao = LinhaDeProducao(sys.argv[1], 6, 0)
+    NOME_ARQUIVO: str = sys.argv[1]
+    NUMERO_MAQUINAS: int = 6
+    TAREFA_INICIAL: int = 0
+
+    LP: LinhaDeProducao = LinhaDeProducao(NOME_ARQUIVO, NUMERO_MAQUINAS, TAREFA_INICIAL)
     LP.imprimir_solucao()
     LP.imprimir_tempo_segundos()
     if LP.esta_precedencias_respeitada():
