@@ -9,6 +9,7 @@ if __name__ == '__main__':
     TAREFA_INICIAL: int = 0
 
     LP: LinhaDeProducao = LinhaDeProducao(NOME_ARQUIVO, NUMERO_MAQUINAS, TAREFA_INICIAL)
+    LP.simulated_annealling(1.005, 1000, 50, 100)
     LP.imprimir_solucao()
     LP.imprimir_tempo_segundos()
     if LP.esta_precedencias_respeitada():

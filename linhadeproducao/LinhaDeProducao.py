@@ -3,6 +3,7 @@ import math
 import sys
 import time
 import random
+import copy
 
 NOME_ARQUIVO_SOLUCAO = 'solução.txt'
 
@@ -27,7 +28,6 @@ class LinhaDeProducao:
         self.ler_arquivo(nome_arquivo)
         self.inicializar_maquinas(numero_maquinas)
         self.criar_solucao_inicial_BFS(tarefa_inicial)
-        self.refinar_solucao(1000)
 
     def inicializar_maquinas(self, numero_maquinas: int):
         tarefas_por_maquina: int = int(math.floor(self.quantidade_tarefas / numero_maquinas))
@@ -248,11 +248,6 @@ class LinhaDeProducao:
 
         return tarefa_maior_custo
 
-
-
-
-
-
     def salvar_solucao(self):
         with open(NOME_ARQUIVO_SOLUCAO, 'w+') as arquivo_solucao:
             stdout_original = sys.stdout
@@ -333,36 +328,83 @@ class LinhaDeProducao:
         tempo_final = time.perf_counter()
         self.tempo_execucao = tempo_final - self.tempo_inicial
 
-    def perturbar_solucao(self) -> tuple[int, int, int]:
-        index_maquina_aleatoria: int = random.randrange(len(self.maquinas))
+    def perturbar_solucao(self, maximo_iteracoes):
+        index_maquina_aleatoria: int = random.randrange(0, stop=len(self.maquinas), step=1)
         index_maquinas_adjacentes: list[int] = self.pegar_index_maquinas_adjacentes(index_maquina_aleatoria)
+
         index_maquina_adjacente_aleatoria: int = random.choice(index_maquinas_adjacentes)
 
-        tarefas_adjascentes_maquina_escolhida = self.pegar_tarefas_sucessoras_entre_maquinas(index_maquina_adjacente_aleatoria, index_maquina_aleatoria)
+        tarefas_adjascentes_maquina_escolhida = self.pegar_tarefas_sucessoras_entre_maquinas(
+            index_maquina_adjacente_aleatoria, index_maquina_aleatoria)
 
-        if not tarefas_adjascentes_maquina_escolhida:
-            temp = index_maquina_aleatoria
-            index_maquina_aleatoria = index_maquina_adjacente_aleatoria
-            index_maquina_adjacente_aleatoria = temp
+        for i in range(maximo_iteracoes):
+            if not tarefas_adjascentes_maquina_escolhida:
+                temp = index_maquina_aleatoria
+                index_maquina_aleatoria = index_maquina_adjacente_aleatoria
+                index_maquina_adjacente_aleatoria = temp
 
-            tarefas_adjascentes_maquina_escolhida = self.pegar_tarefas_sucessoras_entre_maquinas(index_maquina_adjacente_aleatoria, index_maquina_aleatoria)
+                tarefas_adjascentes_maquina_escolhida = self.pegar_tarefas_sucessoras_entre_maquinas(
+                    index_maquina_adjacente_aleatoria, index_maquina_aleatoria)
 
-            for tarefa in tarefas_adjascentes_maquina_escolhida:
-                self.doar_tarefa(index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+                for tarefa in tarefas_adjascentes_maquina_escolhida:
+                    self.doar_tarefa(index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
 
-                if not self.esta_precedencias_respeitada():
-                    self.doar_tarefa(index_maquina_adjacente_aleatoria)
+                    if not self.esta_precedencias_respeitada() or len(
+                            self.maquinas[index_maquina_aleatoria].tarefas) == 0:
+                        self.doar_tarefa(index_maquina_adjacente_aleatoria, index_maquina_aleatoria, tarefa)
+                    else:
+                        return
+
+            else:
+                for tarefa in tarefas_adjascentes_maquina_escolhida:
+                    self.doar_tarefa(index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+
+                    if not self.esta_precedencias_respeitada() or len(
+                            self.maquinas[index_maquina_aleatoria].tarefas) == 0:
+                        self.doar_tarefa(index_maquina_adjacente_aleatoria, index_maquina_aleatoria, tarefa)
+                    else:
+                        return
+
+    def calcular_FO_solucao(self, lista_maquinas: list[Maquina]):
+        maior_FO = 0
+        for m in lista_maquinas:
+            FO_da_maquina = 0
+            for t in m.tarefas:
+                FO_da_maquina += self.tarefas[t]
+
+            if FO_da_maquina > maior_FO:
+                maior_FO = FO_da_maquina
+
+        return maior_FO
+
+    def simulated_annealling(self, divisor_temperatura, temperatura_inicial, temperatura_controle,
+                             iteracoes_por_temperatura):
+        tempo_inicial = time.perf_counter()
+
+        melhor_solucao = copy.deepcopy(self.maquinas)
+        temperatura_corrente = temperatura_inicial
+
+        while temperatura_corrente >= temperatura_controle:
+            for i in range(iteracoes_por_temperatura):
+                solucao_inicial = copy.deepcopy(self.maquinas)
+                self.perturbar_solucao(12)
+
+                FO_inicial = self.calcular_FO_solucao(solucao_inicial)
+                FO_perturbada = self.pegar_maior_FO()
+                FO_melhor_solucao = self.calcular_FO_solucao(melhor_solucao)
+                variacao = FO_perturbada - FO_inicial
+
+                if variacao < 0:
+                    if FO_perturbada < FO_melhor_solucao:
+                        melhor_solucao = copy.deepcopy(self.maquinas)
                 else:
-                    return (index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+                    valor_aleatorio = random.random()
+                    if valor_aleatorio > math.exp((-variacao) / temperatura_corrente):
+                        self.maquinas = solucao_inicial
 
-        else:
-            for tarefa in tarefas_adjascentes_maquina_escolhida:
-                self.doar_tarefa(index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+            temperatura_corrente /= divisor_temperatura
 
-                if not self.esta_precedencias_respeitada():
-                    self.doar_tarefa(index_maquina_adjacente_aleatoria)
-                else:
-                    return (index_maquina_aleatoria, index_maquina_adjacente_aleatoria, tarefa)
+        self.maquinas = melhor_solucao
 
-    def simulated_annealing(self):
-        pass
+        tempo_final = time.perf_counter()
+        self.tempo_execucao = tempo_final - tempo_inicial
